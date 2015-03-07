@@ -24,7 +24,6 @@ import (
     "os/exec"
     "errors"
     "strings"
-    "kit/kitutils"
     "os"
 )
 
@@ -165,7 +164,7 @@ func (ds *DistShell) GetFile(filestring string, destination string) error {
     for i := range ds.HOSTS {
         go func(hostname *Host, cmdStatus chan string){
             remoteFile := hostname.Name + ":" + filestring
-            cmdout, cmderr := kitutils.RunCMD(SCP, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", remoteFile, destination)
+            cmdout, cmderr := RunCMD(SCP, "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", remoteFile, destination)
             if cmderr != nil {
                 hostname.CmdError = cmderr
                 cmdStatus <-  fmt.Sprintf("%s: ERROR %s: %s", hostname.Name, cmdout, cmderr)
@@ -268,20 +267,16 @@ func (ds *DistShell) DumpAllStdout() {
     }
 }
 
-// runs command using exec and returns a string slice with command output
-func RunCmdOutput(s string, arg ...string) ([]string, error) {
-    execOut, err := exec.Command(s, arg...).Output()
-    output := make([]string, 0)
-
-    if err != nil {
-        return output, &UtilError{"RunCmdOutput", errors.New(s + ": " + err.Error() + "\noutput:" + string(execOut))}
+// Execute comamnd and return byte output and error
+func RunCMD(c string, args ...string) ([]byte, error) {
+    fullCmd := c
+    for i := range args {
+        fullCmd += " " + args[i]
     }
-    output = strings.Split(fmt.Sprintf("%s", execOut), "\n")
 
-    if output[len(output)-1] == "\n" {
-        return output[0 : len(output)-1], nil
-    } else {
-        return output, nil
+    cpout, cperr := exec.Command(c, args...).CombinedOutput()
+    if cperr != nil {
+        return cpout, errors.New("Failed to execute command '" + fullCmd + "': " + cperr.Error())
     }
+    return cpout, cperr
 }
-
